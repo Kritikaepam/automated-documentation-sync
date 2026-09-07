@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from html.parser import HTMLParser
 from automated_documentation_sync.domain.models import SourceLocation
+from automated_documentation_sync.domain.faq import FAQEntry
 from automated_documentation_sync.ingestion.contracts import RepositoryDocument
 from automated_documentation_sync.ingestion.mhtml_reader import EmbeddedResource, read_source_document
 
@@ -52,6 +53,7 @@ class ParsedPolicyDocument:
     effective_dates: tuple[str, ...]
     attachments: tuple[EmbeddedResource, ...]
     unresolved_references: tuple[str, ...]
+    faq_entries: tuple[FAQEntry, ...] = ()
     source_location: SourceLocation | None = None
 
 
@@ -212,11 +214,14 @@ def parse_policy_document(document: RepositoryDocument) -> ParsedPolicyDocument:
     parser = _PolicyHTMLParser(document.commit_sha)
     parser.feed(parsed_source.html_content.decode("utf-8", errors="replace"))
     parser.close()
-    return parser.result(
+    parsed = parser.result(
         document.content,
         parsed_source.resources,
         parsed_source.unresolved_references,
     )
+    from automated_documentation_sync.parsing.faq_parser import extract_faq_entries
+
+    return replace(parsed, faq_entries=extract_faq_entries(parsed))
 
 
 class PolicyParser:
