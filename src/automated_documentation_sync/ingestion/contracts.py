@@ -47,8 +47,8 @@ class RepositoryDocument:
     media_type: str | None = None
 
     def __post_init__(self) -> None:
-        if not self.content or not self.repository or not self.path or not self.ref or not self.commit_sha:
-            raise ValueError("Repository document content and provenance metadata are required")
+        if self.content is None or not self.repository or not self.path or not self.ref or not self.commit_sha:
+            raise ValueError("Repository document provenance metadata are required")
 
 
 @dataclass(frozen=True)
