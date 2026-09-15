@@ -75,11 +75,18 @@ def test_approval_requires_authorized_reviewer_and_valid_evidence():
     orchestrator = SyncOrchestrator()
     awaiting_review(orchestrator)
     service = ReviewService(orchestrator)
+    service.present(change_set, proposal, artifact)
 
     with pytest.raises(UnauthorizedReviewerError):
         service.submit("run-1", evidence(artifact), reviewer_authorized=False, artifact=artifact)
 
-    service.submit("run-1", evidence(artifact), reviewer_authorized=True, artifact=artifact)
+    service.submit(
+        "run-1",
+        evidence(artifact),
+        reviewer_authorized=True,
+        artifact=artifact,
+        not_found_outcomes={"payment confirmation evidence": ReviewDecision.RETURNED},
+    )
     assert orchestrator.resume("run-1").state is SyncState.APPROVED
     assert service.evidence_for("run-1") == evidence(artifact)
 

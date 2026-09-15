@@ -4,11 +4,13 @@ from dataclasses import dataclass
 
 from automated_documentation_sync.generation.artifacts import ArtifactSnapshot
 from automated_documentation_sync.generation.renderer import DocumentationProposal
+from automated_documentation_sync.changes.confidence import ConfidenceAssessment
 from automated_documentation_sync.sync.change_sets import ChangeSet
 from automated_documentation_sync.workflow.orchestrator import SyncOrchestrator
 from automated_documentation_sync.workflow.sync_states import SyncState
 
 from .evidence import ReviewDecision, ReviewEvidence
+from .gates import evaluate_approval_gate, require_approval_allowed
 
 
 class UnauthorizedReviewerError(PermissionError):
@@ -30,6 +32,7 @@ class ReviewService:
     def __init__(self, orchestrator: SyncOrchestrator) -> None:
         self.orchestrator = orchestrator
         self._evidence: dict[str, ReviewEvidence] = {}
+        self._change_sets: dict[str, ChangeSet] = {}
 
     def present(
         self,
@@ -41,6 +44,7 @@ class ReviewService:
             raise ValueError("Proposal, artifact, and change set identifiers must match")
         if artifact.content_hash != proposal.content_hash:
             raise ValueError("Artifact hash does not match proposal content")
+        self._change_sets[change_set.change_set_id] = change_set
         return ReviewView(
             proposal=proposal,
             conflicts=change_set.conflicts,
@@ -58,6 +62,8 @@ class ReviewService:
         *,
         reviewer_authorized: bool,
         artifact: ArtifactSnapshot,
+        confidence_assessments: tuple[ConfidenceAssessment, ...] = (),
+        not_found_outcomes: dict[str, object] | None = None,
     ) -> ReviewEvidence:
         if not reviewer_authorized:
             raise UnauthorizedReviewerError(evidence.reviewer_identity)
@@ -67,6 +73,16 @@ class ReviewService:
             raise ValueError("Review source version does not match snapshot")
         if evidence.clarification_version != artifact.clarification_version:
             raise ValueError("Review clarification version does not match snapshot")
+        change_set = self._change_sets.get(artifact.change_set_id)
+        if evidence.decision is ReviewDecision.APPROVED:
+            if change_set is None:
+                raise ValueError("Change set must be presented before approval")
+            gate = evaluate_approval_gate(
+                change_set,
+                confidence_assessments=confidence_assessments,
+                not_found_outcomes=not_found_outcomes,
+            )
+            require_approval_allowed(gate)
         checkpoint = self.orchestrator.resume(run_id)
         if checkpoint.state is not SyncState.AWAITING_REVIEW:
             raise ValueError("Review evidence requires SYNC_AWAITING_REVIEW")
