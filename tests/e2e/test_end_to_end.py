@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from automated_documentation_sync.changes.conflicts import ConflictKind, ConflictRecord
+from automated_documentation_sync.changes.conflicts import ConflictKind, ConflictRecord, ReviewOutcome
 from automated_documentation_sync.generation.artifacts import create_artifact_snapshot
 from automated_documentation_sync.generation.renderer import DocumentationProposal
 from automated_documentation_sync.ingestion import RepositoryDocument
@@ -76,12 +76,12 @@ def test_happy_path_reaches_published_only_after_review_and_fake_publication():
         evidence(artifact),
         reviewer_authorized=True,
         artifact=artifact,
-        not_found_outcomes={"payment confirmation evidence": ReviewDecision.RETURNED},
+        not_found_outcomes={"payment confirmation evidence": ReviewOutcome.RETURNED},
     )
 
     publication = FakePublicationRepository()
     publication.publish(approved=True, artifact_id=artifact.artifact_id, content_hash=artifact.content_hash)
-    orchestrator.transition("e2e-run", SyncState.PUBLISHED, artifact_hash=artifact.content_hash)
+    orchestrator._publish_after_confirmation("e2e-run", artifact_hash=artifact.content_hash)
 
     assert orchestrator.resume("e2e-run").state is SyncState.PUBLISHED
     assert publication.published[artifact.artifact_id] == artifact.content_hash

@@ -87,7 +87,10 @@ class ReviewService:
         if checkpoint.state is not SyncState.AWAITING_REVIEW:
             raise ValueError("Review evidence requires SYNC_AWAITING_REVIEW")
         target = SyncState.APPROVED if evidence.decision is ReviewDecision.APPROVED else SyncState.PROPOSED
-        self.orchestrator.transition(run_id, target, artifact_hash=artifact.content_hash)
+        if target is SyncState.APPROVED:
+            self.orchestrator._approve_after_review(run_id, artifact_hash=artifact.content_hash)
+        else:
+            self.orchestrator.transition(run_id, target, artifact_hash=artifact.content_hash)
         self._evidence[run_id] = evidence
         return evidence
 

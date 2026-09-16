@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class ConfigurationError(ValueError):
@@ -18,6 +19,18 @@ class ProjectConfiguration:
             raise ConfigurationError("Required project calendar configuration is Not Found")
         if self.working_hours not in (8, 9):
             raise ConfigurationError("Project working hours must be 8 or 9")
+        if self.week_start_day not in {
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+        }:
+            raise ConfigurationError("Project week start day is invalid")
+        try:
+            ZoneInfo(self.time_zone)
+        except ZoneInfoNotFoundError:
+            if self.time_zone != "UTC" and (
+                "/" not in self.time_zone
+                or any(not component for component in self.time_zone.split("/"))
+            ):
+                raise ConfigurationError("Project time zone is invalid")
 
 
 def require_project_configuration(values: dict[str, Any]) -> ProjectConfiguration:

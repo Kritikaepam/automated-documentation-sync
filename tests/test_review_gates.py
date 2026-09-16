@@ -5,7 +5,12 @@ from automated_documentation_sync.changes.conflicts import ConflictKind, Conflic
 from automated_documentation_sync.changes.detector import ChangeType, PolicyChange
 from automated_documentation_sync.domain.classifications import Classification
 from automated_documentation_sync.domain.models import SourceLocation
-from automated_documentation_sync.review.gates import ApprovalBlockedError, evaluate_approval_gate, require_approval_allowed
+from automated_documentation_sync.review.gates import (
+    ApprovalBlockedError,
+    InvalidReviewOutcomeError,
+    evaluate_approval_gate,
+    require_approval_allowed,
+)
 from automated_documentation_sync.sync.change_sets import build_change_set
 
 
@@ -68,3 +73,11 @@ def test_explicit_outcomes_allow_approval_without_silent_resolution():
 
     assert result.can_approve is True
     require_approval_allowed(result)
+
+
+def test_invalid_not_found_outcome_does_not_clear_the_gate():
+    with pytest.raises(InvalidReviewOutcomeError):
+        evaluate_approval_gate(
+            change_set(not_found_items=("payment evidence",)),
+            not_found_outcomes={"payment evidence": "invented-outcome"},
+        )

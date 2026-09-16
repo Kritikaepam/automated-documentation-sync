@@ -20,6 +20,10 @@ class ApprovalBlockedError(ValueError):
     """Raised when unresolved change evidence prevents approval."""
 
 
+class InvalidReviewOutcomeError(ValueError):
+    """Raised when a Not Found item receives an unsupported outcome."""
+
+
 def evaluate_approval_gate(
     change_set: ChangeSet,
     *,
@@ -27,6 +31,13 @@ def evaluate_approval_gate(
     not_found_outcomes: Mapping[str, ReviewOutcome] | None = None,
 ) -> ApprovalGateResult:
     outcomes = not_found_outcomes or {}
+    invalid_outcomes = tuple(
+        item for item, outcome in outcomes.items() if not isinstance(outcome, ReviewOutcome)
+    )
+    if invalid_outcomes:
+        raise InvalidReviewOutcomeError(
+            f"Unsupported review outcomes for: {', '.join(invalid_outcomes)}"
+        )
     unresolved_conflicts = tuple(
         conflict.conflict_id
         for conflict in change_set.conflicts
@@ -60,4 +71,10 @@ def require_approval_allowed(result: ApprovalGateResult) -> None:
         raise ApprovalBlockedError(f"Explicit review outcomes are required: {', '.join(blocked)}")
 
 
-__all__ = ["ApprovalBlockedError", "ApprovalGateResult", "evaluate_approval_gate", "require_approval_allowed"]
+__all__ = [
+    "ApprovalBlockedError",
+    "ApprovalGateResult",
+    "InvalidReviewOutcomeError",
+    "evaluate_approval_gate",
+    "require_approval_allowed",
+]

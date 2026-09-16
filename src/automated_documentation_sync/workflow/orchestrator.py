@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .checkpoint_repository import CheckpointRepository, SyncCheckpoint
-from .sync_states import SyncState, validate_transition
+from .sync_states import InvalidSyncTransitionError, SyncState, validate_transition
 
 
 class DuplicateRunError(ValueError):
@@ -33,6 +33,20 @@ class SyncOrchestrator:
         change_set_id: str | None = None,
         artifact_hash: str | None = None,
     ) -> SyncCheckpoint:
+        if target in {SyncState.APPROVED, SyncState.PUBLISHED}:
+            raise InvalidSyncTransitionError(
+                "Approval and publication require controlled workflow boundaries"
+            )
+        return self._transition(run_id, target, change_set_id=change_set_id, artifact_hash=artifact_hash)
+
+    def _transition(
+        self,
+        run_id: str,
+        target: SyncState,
+        *,
+        change_set_id: str | None = None,
+        artifact_hash: str | None = None,
+    ) -> SyncCheckpoint:
         current = self.repository.get(run_id)
         if current is None:
             raise KeyError(run_id)
@@ -46,6 +60,12 @@ class SyncOrchestrator:
         )
         self.repository.replace(checkpoint)
         return checkpoint
+
+    def _approve_after_review(self, run_id: str, *, artifact_hash: str) -> SyncCheckpoint:
+        return self._transition(run_id, SyncState.APPROVED, artifact_hash=artifact_hash)
+
+    def _publish_after_confirmation(self, run_id: str, *, artifact_hash: str) -> SyncCheckpoint:
+        return self._transition(run_id, SyncState.PUBLISHED, artifact_hash=artifact_hash)
 
     def resume(self, run_id: str) -> SyncCheckpoint:
         checkpoint = self.repository.get(run_id)

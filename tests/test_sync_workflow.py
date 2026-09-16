@@ -16,15 +16,35 @@ def test_sync_workflow_persists_canonical_states_and_supports_resume():
         SyncState.CHANGE_DETECTED,
         SyncState.PROPOSED,
         SyncState.AWAITING_REVIEW,
-        SyncState.APPROVED,
-        SyncState.PUBLISHED,
     ):
         orchestrator.transition("run-1", state, change_set_id="change-set-1", artifact_hash="hash-1")
+    orchestrator._approve_after_review("run-1", artifact_hash="hash-1")
+    orchestrator._publish_after_confirmation("run-1", artifact_hash="hash-1")
 
     resumed = SyncOrchestrator(repository).resume("run-1")
     assert resumed.state is SyncState.PUBLISHED
     assert resumed.change_set_id == "change-set-1"
     assert resumed.artifact_hash == "hash-1"
+
+
+def test_direct_approval_and_publication_transitions_are_blocked():
+    orchestrator = SyncOrchestrator()
+    orchestrator.start_run("run-controlled")
+
+    with pytest.raises(InvalidSyncTransitionError, match="controlled workflow"):
+        orchestrator.transition("run-controlled", SyncState.APPROVED)
+    with pytest.raises(InvalidSyncTransitionError, match="controlled workflow"):
+        orchestrator.transition("run-controlled", SyncState.PUBLISHED)
+
+
+def test_checkpoint_history_retains_each_transition():
+    orchestrator = SyncOrchestrator()
+    orchestrator.start_run("run-history")
+    orchestrator.transition("run-history", SyncState.PARSED)
+
+    history = orchestrator.repository.history("run-history")
+
+    assert tuple(checkpoint.state for checkpoint in history) == (SyncState.INGESTED, SyncState.PARSED)
 
 
 def test_sync_workflow_rejects_invalid_transitions_and_duplicate_runs():

@@ -21,9 +21,11 @@ class CheckpointRepository:
 
     def __init__(self) -> None:
         self._records = InMemoryRepository[SyncCheckpoint]()
+        self._history: dict[str, list[SyncCheckpoint]] = {}
 
     def add(self, checkpoint: SyncCheckpoint) -> None:
         self._records.add(checkpoint.run_id, checkpoint)
+        self._history[checkpoint.run_id] = [checkpoint]
 
     def get(self, run_id: str) -> SyncCheckpoint | None:
         return self._records.get(run_id)
@@ -32,6 +34,12 @@ class CheckpointRepository:
         if self.get(checkpoint.run_id) is None:
             raise KeyError(checkpoint.run_id)
         self._records._records[checkpoint.run_id] = checkpoint
+        self._history[checkpoint.run_id].append(checkpoint)
+
+    def history(self, run_id: str) -> tuple[SyncCheckpoint, ...]:
+        if run_id not in self._history:
+            raise KeyError(run_id)
+        return tuple(self._history[run_id])
 
 
 __all__ = ["CheckpointRepository", "SyncCheckpoint"]

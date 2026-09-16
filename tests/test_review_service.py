@@ -5,6 +5,7 @@ import pytest
 
 from automated_documentation_sync.generation.artifacts import create_artifact_snapshot
 from automated_documentation_sync.generation.renderer import DocumentationProposal
+from automated_documentation_sync.changes.conflicts import ReviewOutcome
 from automated_documentation_sync.review.evidence import ReviewDecision, ReviewEvidence
 from automated_documentation_sync.review.service import ReviewService, UnauthorizedReviewerError
 from automated_documentation_sync.sync.change_sets import build_change_set
@@ -85,7 +86,7 @@ def test_approval_requires_authorized_reviewer_and_valid_evidence():
         evidence(artifact),
         reviewer_authorized=True,
         artifact=artifact,
-        not_found_outcomes={"payment confirmation evidence": ReviewDecision.RETURNED},
+        not_found_outcomes={"payment confirmation evidence": ReviewOutcome.RETURNED},
     )
     assert orchestrator.resume("run-1").state is SyncState.APPROVED
     assert service.evidence_for("run-1") == evidence(artifact)
